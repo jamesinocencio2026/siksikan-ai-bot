@@ -157,7 +157,7 @@ def handle_message(user_id, text):
     
     # Structural Safety Closure Window
     if now.hour < 5 or (now.hour == 22 and now.minute > 30) or now.hour > 22:
-        send_text(user_id, "🌙 *Train lines are currently closed.*\nOperating Hours: 5:00 AM - 10:30 PM PHT.")
+        send_text(user_id, "🌙 *Train lines are currently closed.*\n\nOperating Hours: 5:00 AM - 10:30 PM PHT.")
         return
 
     # Strict Intent Verification Gates
