@@ -9,7 +9,7 @@ app = Flask(__name__)
 # =====================================================================
 # SYSTEM ACCESS KEYS (Updated in Part 4!)
 # =====================================================================
-PAGE_ACCESS_TOKEN = "PASTE_YOUR_SECRET_META_TOKEN_HERE"
+PAGE_ACCESS_TOKEN = "EAANcatDsoN0BRiNiOZB1akBBEMsL52LFk4sqFPN8p3583uH7GbdppEs4IT45ypXQOjjHUPGUvtIZAQtaJovCloZBFkr2Q8AyN3mqyXbwrkmuDIiZBuBXbt8jcRxwAgA6ZAw53IkdISf0RaW7ZALtZAfdxE6k8CrpmaXRQ6lUQgZCvuOfPlZB6dLNfxDNiqyXNRMrKwnfXVbQV8QZDZD"
 VERIFY_TOKEN = "SiksikanAIBayanihan2026"
 
 # =====================================================================
