@@ -364,12 +364,13 @@ def send_text(recipient_id, text):
 def send_direction_menu(recipient_id, base_station_key):
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
     
+    # 💡 SHORTENED LABELS: Keeps titles crisp so they fit cleanly on mobile screens
     if "lrt2" in base_station_key:
-        title_1, key_1 = "🚇 Eastbound Platform", f"QUERY_{base_station_key}_eb"
-        title_2, key_2 = "🚇 Westbound Platform", f"QUERY_{base_station_key}_wb"
+        title_1, key_1 = "🚇 Eastbound", f"QUERY_{base_station_key}_eb"
+        title_2, key_2 = "🚇 Westbound", f"QUERY_{base_station_key}_wb"
     else:
-        title_1, key_1 = "🚆 Northbound Platform", f"QUERY_{base_station_key}_nb"
-        title_2, key_2 = "🚆 Southbound Platform", f"QUERY_{base_station_key}_sb"
+        title_1, key_1 = "🚆 Northbound", f"QUERY_{base_station_key}_nb"
+        title_2, key_2 = "🚆 Southbound", f"QUERY_{base_station_key}_sb"
 
     payload = {
         "recipient": {"id": recipient_id},
