@@ -254,6 +254,14 @@ def webhook():
 
                 clean_old_message_ids()
 
+                # 🛠️ Direct Quick Reply payload routing interceptor
+                if event.get("message") and event["message"].get("quick_reply"):
+                    qr_payload = event["message"]["quick_reply"].get("payload")
+                    if qr_payload:
+                        handle_postback(sender_id, qr_payload)
+                        return "EVENT_RECEIVED", 200
+
+                # Normal routing paths
                 if event.get("postback"):
                     handle_postback(sender_id, event["postback"]["payload"])
                 elif event.get("message") and event["message"].get("text"):
