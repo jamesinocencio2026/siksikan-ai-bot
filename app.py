@@ -1,261 +1,283 @@
 import os
-from datetime import datetime, timedelta
-import pytz
 import requests
+from datetime import datetime, timedelta
+from pytz import timezone
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# =====================================================================
-# SYSTEM ACCESS KEYS (Updated in Part 4!)
-# =====================================================================
-PAGE_ACCESS_TOKEN = "EAANcatDsoN0BRiNiOZB1akBBEMsL52LFk4sqFPN8p3583uH7GbdppEs4IT45ypXQOjjHUPGUvtIZAQtaJovCloZBFkr2Q8AyN3mqyXbwrkmuDIiZBuBXbt8jcRxwAgA6ZAw53IkdISf0RaW7ZALtZAfdxE6k8CrpmaXRQ6lUQgZCvuOfPlZB6dLNfxDNiqyXNRMrKwnfXVbQV8QZDZD"
-VERIFY_TOKEN = "SiksikanAIBayanihan2026"
+# --- WEBHOOK & API TOKENS ---
+FB_VERIFY_TOKEN = os.environ.get("WEBHOOK_VERIFY_TOKEN", "BayanihanSiksikanAI2026")
+FB_PAGE_ACCESS_TOKEN = os.environ.get("PAGE_ACCESS_TOKEN")
+OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_KEY")
+TOMTOM_API_KEY = os.environ.get("TOMTOM_KEY")
 
-# =====================================================================
-# MASTER TRANSIT & ADVERTISING ARCHITECTURE
-# =====================================================================
-TRANSIT_SYSTEM = {
-    "mrt3": {
-        "name": "MRT-3 (EDSA Line)",
-        "stations": {
-            "cubao": {
-                "status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1,
-                "ad": "Don't sweat the rush! The team at Jollibee Farmers Plaza (Level 2) is ready to serve you your favorite Chickenjoy right outside the platform exits. 🐝"
-            },
-            "guadalupe": {
-                "status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1,
-                "ad": "Skip the heat! Grab an ice-cold beverage and relax at Macao Imperial Tea right beside the North station stairs. 🧋"
-            },
-            "taft": {"status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1, "ad": ""},
-            "shaw": {"status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1, "ad": ""}
-        }
-    },
-    "lrt2": {
-        "name": "LRT-2 (Antipolo-Recto Line)",
-        "stations": {
-            "cubao": {
-                "status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1,
-                "ad": "Beat the crowd! Gateway Mall 2 restaurants are open for dinner right outside the concourse bridge exit. 🍽️"
-            },
-            "recto": {"status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1, "ad": ""},
-            "katipunan": {"status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1, "ad": ""}
-        }
-    },
-    "lrt1": {
-        "name": "LRT-1 (Baclaran-FPJ Line)",
-        "stations": {
-            "edsa": {"status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1, "ad": ""},
-            "doroteo jose": {"status": "🟢 LIGHT CROWD", "light_votes": [], "medium_votes": [], "heavy_votes": [], "camera_score": 1, "ad": ""}
-        }
-    }
+# --- MEMORY CACHE STORES ---
+# Live counts container: {"station_id": {"light": X, "medium": Y, "heavy": Z, "last_updated": datetime}}
+crowdsourced_votes = {}
+
+# Anti-Spam Lie Detector: {user_id: timestamp}
+user_vote_timestamps = {}
+
+# Idempotency Layer (Fixes Multiple Replies): {message_id: timestamp}
+processed_message_ids = {}
+
+STATION_PROFILES = {
+    "mrt3_taft_nb": {"name": "🚆 MRT-3 Taft Avenue (Northbound → North Ave)", "is_interchange": True, "coords": "14.5376,121.0014"},
+    "mrt3_taft_sb": {"name": "🚆 MRT-3 Taft Avenue (Southbound End Terminal)", "is_interchange": True, "coords": "14.5376,121.0014"},
+    "mrt3_cubao_nb": {"name": "🚆 MRT-3 Cubao (Northbound → North Ave)", "is_interchange": True, "coords": "14.6195,121.0511"},
+    "mrt3_cubao_sb": {"name": "🚆 MRT-3 Cubao (Southbound → Taft Ave)", "is_interchange": True, "coords": "14.6195,121.0511"},
+    "mrt3_guadalupe_nb": {"name": "🚆 MRT-3 Guadalupe (Northbound → North Ave)", "is_interchange": False, "coords": "14.5672,121.0456"},
+    "mrt3_guadalupe_sb": {"name": "🚆 MRT-3 Guadalupe (Southbound → Taft Ave)", "is_interchange": False, "coords": "14.5672,121.0456"},
+    "lrt2_cubao_wb": {"name": "🚇 LRT-2 Cubao (Westbound ← Recto/U-Belt)", "is_interchange": True, "coords": "14.6226,121.0526"},
+    "lrt2_cubao_eb": {"name": "🚇 LRT-2 Cubao (Eastbound → Marikina/Antipolo)", "is_interchange": True, "coords": "14.6226,121.0526"}
 }
 
-def is_train_operating():
-    """Validates operational hours windows (5:00 AM - 10:30 PM PHT)."""
-    manila_tz = pytz.timezone('Asia/Manila')
-    now_manila = datetime.now(manila_tz)
-    current_time = now_manila.time()
-    start_time = datetime.strptime("05:00:00", "%H:%M:%S").time()
-    end_time = datetime.strptime("22:30:00", "%H:%M:%S").time()
-    return start_time <= current_time <= end_time
+PH_HOLIDAYS = ["2026-06-12", "2026-08-31", "2026-11-01", "2026-12-25", "2026-12-30"]
 
-def clear_expired_votes(line_id, station_name):
-    """Wipes out any passenger votes older than 60 minutes to maintain accuracy."""
-    manila_tz = pytz.timezone('Asia/Manila')
-    now = datetime.now(manila_tz)
-    cutoff_time = now - timedelta(hours=1)
+# --- DATA FUSION MODIFIERS ---
+
+def get_weather_impact():
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?q=Manila&appid={OPENWEATHER_API_KEY}"
+        res = requests.get(url, timeout=4).json()
+        if res.get("weather", [{}])[0].get("main", "Clear") in ["Rain", "Thunderstorm", "Drizzle"]:
+            return 15
+    except Exception: pass
+    return 0
+
+def get_traffic_impact(coords):
+    try:
+        url = f"https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?key={TOMTOM_API_KEY}&point={coords}"
+        res = requests.get(url, timeout=4).json()
+        speed = res.get("flowSegmentData", {}).get("currentSpeed", 30)
+        if speed <= 8: return 20
+        elif speed <= 15: return 10
+    except Exception: pass
+    return 0
+
+def enforce_cache_decay(station_id):
+    """Enforces database cleanliness. If a vote payload is older than 15 mins, flush it."""
+    now = datetime.now()
+    if station_id in crowdsourced_votes:
+        last_updated = crowdsourced_votes[station_id]["last_updated"]
+        if (now - last_updated).total_seconds() > 900: # 15 minutes
+            del crowdsourced_votes[station_id]
+
+def clean_old_message_ids():
+    """Removes processed message IDs older than 5 minutes to prevent memory leaks."""
+    now = datetime.now()
+    expired_ids = [msg_id for msg_id, timestamp in processed_message_ids.items() 
+                   if (now - timestamp).total_seconds() > 300]
+    for msg_id in expired_ids:
+        del processed_message_ids[msg_id]
+
+def calculate_density(station_id, pht_now):
+    enforce_cache_decay(station_id)
+    profile = STATION_PROFILES.get(station_id)
+    if not profile: return "🟢 LIGHT"
     
-    station_cabinet = TRANSIT_SYSTEM[line_id]["stations"][station_name]
-    station_cabinet["light_votes"] = [t for t in station_cabinet["light_votes"] if t > cutoff_time]
-    station_cabinet["medium_votes"] = [t for t in station_cabinet["medium_votes"] if t > cutoff_time]
-    station_cabinet["heavy_votes"] = [t for t in station_cabinet["heavy_votes"] if t > cutoff_time]
+    score = 0
+    hour = pht_now.hour
+    day = pht_now.weekday()
+    date_str = pht_now.strftime("%Y-%m-%d")
+
+    # 1. Historical Directional Vectors
+    if "mrt3_" in station_id:
+        if (6 <= hour <= 9) and station_id.endswith("_sb"): score += 30
+        elif (16 <= hour <= 20) and station_id.endswith("_nb"): score += 30
+    elif "lrt2_" in station_id:
+        if (6 <= hour <= 9) and station_id.endswith("_wb"): score += 30
+        elif (16 <= hour <= 20) and station_id.endswith("_eb"): score += 30
+        
+    if profile["is_interchange"]: score += 10
+
+    # 2. Calendar Anomalies Checking
+    if (pht_now.day in [14, 15, 30, 31]) and day == 4: score += 25
+    elif date_str in PH_HOLIDAYS: score += 20
+
+    # 3. Environmental API Feeds Integration
+    score += get_weather_impact()
+    score += get_traffic_impact(profile["coords"])
+
+    # 4. Filtered Crowdsourced Vectors Layer
+    if station_id in crowdsourced_votes:
+        v = crowdsourced_votes[station_id]
+        total = v["light"] + v["medium"] + v["heavy"]
+        if total > 0:
+            score += ((v["medium"] * 15) + (v["heavy"] * 35)) / total
+
+    if score >= 60: return "🔴 HEAVY"
+    elif score >= 35: return "🟡 MEDIUM"
+    return "🟢 LIGHT"
+
+# --- WEBHOOK SYSTEM INTERACTION PROTOCOLS ---
 
 @app.route("/webhook", methods=["GET"])
-def verify_webhook():
-    mode = request.args.get("hub.mode")
-    token = request.args.get("hub.verify_token")
-    challenge = request.args.get("hub.challenge")
-    if mode == "subscribe" and token == VERIFY_TOKEN:
-        return challenge, 200
-    return "Verification token mismatch", 403
+def verify():
+    if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.verify_token") == FB_VERIFY_TOKEN:
+        return request.args.get("hub.challenge"), 200
+    return "Forbidden", 403
 
 @app.route("/webhook", methods=["POST"])
-def receive_message():
-    data = request.get_json()
-    if data.get("object") == "page":
-        for entry in data["entry"]:
-            for messaging_event in entry.get("messaging", []):
-                sender_id = messaging_event["sender"]["id"]
-                if messaging_event.get("message") and "quick_reply" in messaging_event["message"]:
-                    vote_payload = messaging_event["message"]["quick_reply"]["payload"]
-                    handle_incoming_vote(sender_id, vote_payload)
-                    return "EVENT_RECEIVED", 200
-                if messaging_event.get("message") and "text" in messaging_event["message"]:
-                    user_text = messaging_event["message"]["text"].lower().strip()
-                    process_and_reply(sender_id, user_text)
-    return "EVENT_RECEIVED", 200
+def webhook():
+    payload = request.get_json()
+    if payload.get("object") == "page":
+        for entry in payload.get("entry", []):
+            for event in entry.get("messaging", []):
+                sender_id = event["sender"]["id"]
+                
+                # --- EXTRACT UNIQUE ID FOR DEDUPLICATION ---
+                msg_id = None
+                if event.get("message"):
+                    msg_id = event["message"].get("mid")
+                elif event.get("postback"):
+                    msg_id = f"PB_{event['postback'].get('timestamp')}_{sender_id}"
+                
+                # --- IDEMPOTENCY FILTER BLOCK ---
+                if msg_id:
+                    if msg_id in processed_message_ids:
+                        return "DUPLICATE_IGNORED", 200 # Instantly stop Meta's retry engine
+                    processed_message_ids[msg_id] = datetime.now()
 
-def process_and_reply(sender_id, user_text):
-    if not is_train_operating():
-        reply_text = (
-            "🌙 **Train lines are currently closed.**\n\n"
-            "Operating Hours: 5:00 AM - 10:30 PM PHT.\n\n"
-            "💡 **Siksikan AI Alternative:** The 24/7 EDSA Carousel Bus line "
-            "is operating outside major stations to keep your transit active!"
-        )
-        send_to_messenger(sender_id, reply_text)
+                # Run routine housekeeping
+                clean_old_message_ids()
+
+                # Process verified unique payload safely
+                if event.get("postback"):
+                    handle_postback(sender_id, event["postback"]["payload"])
+                elif event.get("message") and event["message"].get("text"):
+                    handle_message(sender_id, event["message"]["text"].lower().strip())
+        return "EVENT_RECEIVED", 200
+    return "Not Found", 404
+
+def handle_message(user_id, text):
+    pht = timezone("Asia/Manila")
+    now = datetime.now(pht)
+    
+    # Structural Safety Closure Window
+    if now.hour < 5 or (now.hour == 22 and now.minute > 30) or now.hour > 22:
+        send_text(user_id, "🌙 *Train lines are currently closed.*\nOperating Hours: 5:00 AM - 10:30 PM PHT.")
         return
 
-    if "cubao" in user_text:
-        if "mrt" in user_text or "mrt3" in user_text: send_station_status(sender_id, "mrt3", "cubao")
-        elif "lrt" in user_text or "lrt2" in user_text: send_station_status(sender_id, "lrt2", "cubao")
-        else: send_clarification_menu(sender_id, "cubao")
+    # Strict Intent Verification Gates
+    if text in ["cubao", "araneta"]:
+        send_cubao_menu(user_id)
+        return
+    if text in ["taft", "pasay", "edsa"]:
+        send_taft_menu(user_id)
+        return
+    if text in ["guada", "guadalupe"]:
+        send_guadalupe_menu(user_id)
         return
 
-    if "edsa" in user_text or "taft" in user_text:
-        if "mrt" in user_text: send_station_status(sender_id, "mrt3", "taft")
-        elif "lrt" in user_text or "lrt1" in user_text: send_station_status(sender_id, "lrt1", "edsa")
-        else: send_clarification_menu(sender_id, "taft_edsa_interchange")
-        return
+    # Fallback default text prompt
+    send_text(user_id, "👋 Welcome to Siksikan AI! Type a station name to verify conditions (e.g., 'Cubao', 'Taft', or 'Guadalupe').")
 
-    for line_id, line_info in TRANSIT_SYSTEM.items():
-        for station_name in line_info["stations"].keys():
-            if station_name in user_text:
-                send_station_status(sender_id, line_id, station_name)
-                return
-
-    fallback_prompt = (
-        "Welcome to **Siksikan AI** 🚆 Which station would you like to check?\n\n"
-        "Please specify both the Line Name and Station Name for instant results.\n\n"
-        "💡 Examples: 'MRT Cubao', 'LRT Katipunan', 'MRT Guadalupe'"
-    )
-    send_to_messenger(sender_id, fallback_prompt)
-
-def send_station_status(sender_id, line_id, station_name):
-    clear_expired_votes(line_id, station_name)
-    line_title = TRANSIT_SYSTEM[line_id]["name"]
-    info = TRANSIT_SYSTEM[line_id]["stations"][station_name]
+def handle_postback(user_id, payload):
+    pht = timezone("Asia/Manila")
+    now = datetime.now(pht)
     
-    l_count = len(info["light_votes"])
-    m_count = len(info["medium_votes"])
-    h_count = len(info["heavy_votes"])
-    
-    response_text = (
-        f"📍 **{line_title} - {station_name.upper()} STATION**\n\n"
-        f"Crowd Status: {info['status']}\n\n"
-        f"🗳️ **Active Live Votes (Last 60 Mins):**\n"
-        f"• Light Reports: {l_count}\n"
-        f"• Medium Reports: {m_count}\n"
-        f"• Heavy Reports: {h_count}\n"
-    )
-    
-    # Injection of clean B2B sponsor advertisement branding text
-    ad_text = info.get("ad", "")
-    if ad_text:
-        response_text += f"\n📢 **Sponsor:** {ad_text}\n"
+    if payload.startswith("QUERY_"):
+        station_key = payload.replace("QUERY_", "")
+        deliver_dashboard(user_id, station_key, now)
         
-    response_text += f"\nAre you at this station now? Help fellow commuters by voting below:"
-    
-    url = f"https://graph.facebook.com/v19.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
+    elif payload.startswith("VOTE_"):
+        # Anti-Spam Lie Detection Enforcement
+        if user_id in user_vote_timestamps:
+            last_vote = user_vote_timestamps[user_id]
+            if (datetime.now() - last_vote).total_seconds() < 900: # 15 mins block
+                send_text(user_id, "🔒 Your vote has already been counted recently!")
+                return
+        
+        parts = payload.split("_")
+        tier = parts[1].lower() # light, medium, heavy
+        station_id = "_".join(parts[2:])
+        
+        # Write to dynamic state data index
+        if station_id not in crowdsourced_votes:
+            crowdsourced_votes[station_id] = {"light": 0, "medium": 0, "heavy": 0, "last_updated": datetime.now()}
+        
+        crowdsourced_votes[station_id][tier] += 1
+        crowdsourced_votes[station_id]["last_updated"] = datetime.now()
+        user_vote_timestamps[user_id] = datetime.now()
+        
+        send_text(user_id, "✅ Thank you! Your real-time platform vote has been saved.")
+
+def deliver_dashboard(user_id, station_key, current_time):
+    status = calculate_density(station_key, current_time)
+    name = STATION_PROFILES[station_key]["name"]
+    msg = f"📊 *Siksikan AI Dashboard Update*\n\n📍 Station: {name}\nStatus: {status}\n\nHelp your fellow commuters! If you are standing at the platform right now, please verify below:"
+    send_simplified_buttons(user_id, msg, station_key)
+
+def send_text(recipient_id, text):
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
+    requests.post(url, json={"recipient": {"id": recipient_id}, "message": {"text": text}}, timeout=5)
+
+def send_cubao_menu(recipient_id):
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
     payload = {
-        "recipient": {"id": sender_id}, "messaging_type": "RESPONSE",
+        "recipient": {"id": recipient_id},
         "message": {
-            "text": response_text,
+            "text": "📍 *Which Cubao Station are you heading to?*\n\nCubao is an interchange for two separate lines. Please tap your exact line and direction below:",
             "quick_replies": [
-                {"content_type": "text", "title": "Report Light 🟢", "payload": f"vote_light_{line_id}_{station_name}"},
-                {"content_type": "text", "title": "Report Medium 🟡", "payload": f"vote_medium_{line_id}_{station_name}"},
-                {"content_type": "text", "title": "Report Heavy 🔴", "payload": f"vote_heavy_{line_id}_{station_name}"}
+                {"content_type": "text", "title": "🚆 MRT Northbound", "payload": "QUERY_mrt3_cubao_nb"},
+                {"content_type": "text", "title": "🚆 MRT Southbound", "payload": "QUERY_mrt3_cubao_sb"},
+                {"content_type": "text", "title": "🚇 LRT Westbound", "payload": "QUERY_lrt2_cubao_wb"},
+                {"content_type": "text", "title": "🚇 LRT Eastbound", "payload": "QUERY_lrt2_cubao_eb"}
             ]
         }
     }
-    requests.post(url, json=payload)
+    requests.post(url, json=payload, timeout=5)
 
-def send_clarification_menu(sender_id, duplicate_type):
-    url = f"https://graph.facebook.com/v19.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
-    if duplicate_type == "cubao":
-        payload = {
-            "recipient": {"id": sender_id}, "messaging_type": "RESPONSE",
-            "message": {
-                "text": "Which 'Cubao' Station do you mean?",
-                "quick_replies": [
-                    {"content_type": "text", "title": "MRT-3 Cubao (EDSA)", "payload": "mrt3_cubao"},
-                    {"content_type": "text", "title": "LRT-2 Cubao (Aurora)", "payload": "lrt2_cubao"}
-                ]
+def send_taft_menu(recipient_id):
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {
+            "text": "📍 *Which Taft Avenue Platform direction are you checking?*",
+            "quick_replies": [
+                {"content_type": "text", "title": "🚆 Northbound (To EDSA)", "payload": "QUERY_mrt3_taft_nb"},
+                {"content_type": "text", "title": "🚆 Southbound Terminal", "payload": "QUERY_mrt3_taft_sb"}
+            ]
+        }
+    }
+    requests.post(url, json=payload, timeout=5)
+
+def send_guadalupe_menu(recipient_id):
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {
+            "text": "📍 *Which Guadalupe Station direction are you checking?*",
+            "quick_replies": [
+                {"content_type": "text", "title": "🚆 Northbound (To North Ave)", "payload": "QUERY_mrt3_guadalupe_nb"},
+                {"content_type": "text", "title": "🚆 Southbound (To Taft)", "payload": "QUERY_mrt3_guadalupe_sb"}
+            ]
+        }
+    }
+    requests.post(url, json=payload, timeout=5)
+
+def send_simplified_buttons(recipient_id, text, station_id):
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {
+            "attachment": {
+                "type": "template",
+                "payload": {
+                    "template_type": "button",
+                    "text": text,
+                    "buttons": [
+                        {"type": "postback", "title": "🟢 Light", "payload": f"VOTE_LIGHT_{station_id}"},
+                        {"type": "postback", "title": "🟡 Medium", "payload": f"VOTE_MEDIUM_{station_id}"},
+                        {"type": "postback", "title": "🔴 Heavy", "payload": f"VOTE_HEAVY_{station_id}"}
+                    ]
+                }
             }
         }
-    else:
-        payload = {
-            "recipient": {"id": sender_id}, "messaging_type": "RESPONSE",
-            "message": {
-                "text": "Which line at the Pasay Rotonda interchange do you mean?",
-                "quick_replies": [
-                    {"content_type": "text", "title": "MRT-3 Taft Station", "payload": "mrt3_taft"},
-                    {"content_type": "text", "title": "LRT-1 EDSA Station", "payload": "lrt1_edsa"}
-                ]
-            }
-        }
-    requests.post(url, json=payload)
-
-def handle_incoming_vote(sender_id, payload):
-    parts = payload.split("_")
-    if len(parts) < 4: return
-    vote_type, line_id, station_name = parts[1], parts[2], parts[3]
-    station_cabinet = TRANSIT_SYSTEM[line_id]["stations"][station_name]
-    
-    manila_tz = pytz.timezone('Asia/Manila')
-    timestamp_now = datetime.now(manila_tz)
-    
-    if vote_type == "light": station_cabinet["light_votes"].append(timestamp_now)
-    elif vote_type == "medium": station_cabinet["medium_votes"].append(timestamp_now)
-    elif vote_type == "heavy": station_cabinet["heavy_votes"].append(timestamp_now)
-
-    recalculate_station_status(line_id, station_name)
-    send_to_messenger(sender_id, "Thank you for reporting! 🗳️ Your vote has been added. Travel safely!")
-
-@app.route("/update_camera", methods=["POST"])
-def update_camera():
-    data = request.get_json()
-    if data.get("secret_key") != "SiksikanAICameraSecure2026":
-        return jsonify({"error": "Unauthorized"}), 403
-        
-    line_id, station_name, new_score = data.get("line_id"), data.get("station"), int(data.get("score"))
-    if line_id in TRANSIT_SYSTEM and station_name in TRANSIT_SYSTEM[line_id]["stations"]:
-        station_cabinet = TRANSIT_SYSTEM[line_id]["stations"][station_name]
-        
-        # Freshness Fix: Wipe stale user arrays if camera notes a crowd shift
-        if station_cabinet["camera_score"] != new_score:
-            station_cabinet["light_votes"], station_cabinet["medium_votes"], station_cabinet["heavy_votes"] = [], [], []
-            
-        station_cabinet["camera_score"] = new_score
-        recalculate_station_status(line_id, station_name)
-        return jsonify({"status": "Success"}), 200
-    return jsonify({"error": "Not Found"}), 404
-
-def recalculate_station_status(line_id, station_name):
-    clear_expired_votes(line_id, station_name)
-    station_cabinet = TRANSIT_SYSTEM[line_id]["stations"][station_name]
-    cctv_base_score = station_cabinet["camera_score"]
-    l_v, m_v, h_v = len(station_cabinet["light_votes"]), len(station_cabinet["medium_votes"]), len(station_cabinet["heavy_votes"])
-    total_human_votes = l_v + m_v + h_v
-    
-    if total_human_votes == 0:
-        if cctv_base_score == 3:   station_cabinet["status"] = "🔴 HEAVY CROWD"
-        elif cctv_base_score == 2: station_cabinet["status"] = "🟡 MEDIUM CROWD"
-        else:                      station_cabinet["status"] = "🟢 LIGHT CROWD"
-        return
-
-    total_points = (cctv_base_score) + (l_v * 1) + (m_v * 2) + (h_v * 3)
-    weighted_average = total_points / (1 + total_human_votes)
-    
-    if weighted_average >= 2.34:   station_cabinet["status"] = "🔴 HEAVY CROWD"
-    elif weighted_average >= 1.67: station_cabinet["status"] = "🟡 MEDIUM CROWD"
-    else:                          station_cabinet["status"] = "🟢 LIGHT CROWD"
-
-def send_to_messenger(sender_id, text_to_send):
-    url = f"https://graph.facebook.com/v19.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
-    payload = {"recipient": {"id": sender_id}, "message": {"text": text_to_send}}
-    requests.post(url, json=payload)
+    }
+    requests.post(url, json=payload, timeout=5)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(host="0.0.0.0", port=5000)
