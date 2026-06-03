@@ -269,8 +269,27 @@ def handle_message(user_id, text):
         send_text(user_id, "🌙 *Train lines are currently closed.*\n\nOperating Hours: 5:00 AM - 10:30 PM PHT.")
         return
 
+    # 🛠️ FIX: Intercept the Quick Reply Button text so it routes to the Dashboard
+    if "platform" in text:
+        for key, data in STATION_PROFILES.items():
+            station_base_words = data["name"].lower().replace("(", "").replace(")", "").split()
+            if any(word in text for word in station_base_words if len(word) > 4):
+                if "northbound" in text and key.endswith("_nb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+                elif "southbound" in text and key.endswith("_sb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+                elif "eastbound" in text and key.endswith("_eb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+                elif "westbound" in text and key.endswith("_wb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+
+    # Existing Dynamic Station Intent Search Gate
     matched_stations = []
-    cleaned_text = text.replace("station", "").replace("stn", "").strip()
+    cleaned_text = text.replace("station", "").replace("stn", "").replace("status", "").strip()
     
     for key, data in STATION_PROFILES.items():
         clean_station_name = data["name"].lower()
@@ -284,7 +303,6 @@ def handle_message(user_id, text):
         return
 
     send_text(user_id, "👋 Welcome to Siksikan AI!\n\nType any active station name from LRT-1, LRT-2, or MRT-3 to verify platform congestion conditions and live local weather details (e.g., 'Guadalupe', 'Gil Puyat', 'Recto').")
-
 def handle_postback(user_id, payload):
     pht = timezone("Asia/Manila")
     now = datetime.now(pht)
