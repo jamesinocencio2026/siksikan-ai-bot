@@ -275,10 +275,11 @@ def get_weather_data(lat, lon):
     except Exception:
         return 0, "Data Unavailable"
 
-def get_traffic_impact(coords):
+def get_traffic_impact(lat, lon):
     """Fetches real-time highway speeds directly from TomTom API to verify baseline gridlock."""
     try:
-        url = f"https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?key={TOMTOM_API_KEY}&point={coords}"
+        # 💥 THE FIX: Send the independent lat and lon variables separated by a comma into TomTom's point parameter
+        url = f"https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?key={TOMTOM_API_KEY}&point={lat},{lon}"
         res = requests.get(url, timeout=3).json()
         speed = res.get("flowSegmentData", {}).get("currentSpeed", 30)
         
