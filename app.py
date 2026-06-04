@@ -258,10 +258,9 @@ def get_recent_crowdsource_score(station_key):
         print(f"Crowdsource vector engine error: {e}")
         return 0, 0
 
-def get_weather_data(coords):
+def get_weather_data(lat, lon):
     """Fetches real-time weather text description and impact score for specific station coordinates."""
     try:
-        lat, lon = coords.split(",")
         url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=metric"
         res = requests.get(url, timeout=3).json()
         
