@@ -302,10 +302,18 @@ def calculate_density(station_id, pht_now, weather_impact):
     if not profile: return "🟢 LIGHT PLATFORM"
     
     score = 0
+    
+    # Define these FIRST so the rush hour check below can read them!
     hour = pht_now.hour
     day = pht_now.weekday()
     date_str = pht_now.strftime("%Y-%m-%d")
-
+    
+    # 🕒 1. Auto-Inject Manila Rush Hour Baseline Multipliers (Predictive Layer)
+    # Morning Peak: 6:00 AM - 9:00 AM | Evening Peak: 4:00 PM - 8:00 PM
+    is_rush_hour = (6 <= hour <= 9) or (16 <= hour <= 20)
+    if is_rush_hour:
+        score += 35  # Pushes the base score to a minimum of 35 (MEDIUM CONGESTION)
+        
     # 1. Directional Volume Projections (Directional Vectors)
     if "mrt3_" in station_id or "lrt1_" in station_id:
         if (6 <= hour <= 9) and station_id.endswith("_sb"): score += 30
@@ -317,9 +325,7 @@ def calculate_density(station_id, pht_now, weather_impact):
     if profile["is_interchange"]: score += 10
 
     # 2. Calendar Anomalies & Holiday Offsets
-    if (pht_now.day in [14, 15, 30, 31]) and day == 4: score += 25
-    elif date_str in PH_HOLIDAYS: score += 20
-
+    
    # # 3. Environment API Injection
     score += weather_impact
     
@@ -332,10 +338,13 @@ def calculate_density(station_id, pht_now, weather_impact):
     crowd_score, total_voters = get_recent_crowdsource_score(station_id)
     score += crowd_score
 
-    # Final Density Categorization Output
-    if score >= 60: return "🔴 HEAVY CONGESTION"
-    elif score >= 35: return "🟡 MEDIUM CONGESTION"
-    return "🟢 LIGHT PLATFORM"
+    # # Final Density Categorization Output (Adjusted for standalone API weights)
+    if score >= 45: 
+        return "HEAVY PLATFORM"
+    elif score >= 25: 
+        return "MEDIUM PLATFORM"
+    
+    return "LIGHT PLATFORM"
 
 # --- SYSTEM ROUTERS ---
 
@@ -493,8 +502,27 @@ def deliver_dashboard(user_id, station_key, current_time):
         f"verify conditions by choosing below:"
     )
     
-    # 5. Dispatch UI Payload Block directly to Meta Webhook Graph Channel
-    send_text(user_id, dashboard_text)
+    # 5. Generate Facebook Messenger Interactive Quick Replies Array
+    quick_replies_payload = [
+        {
+            "content_type": "text",
+            "title": "🟢 Light",
+            "payload": f"vote_light_{station_key}"
+        },
+        {
+            "content_type": "text",
+            "title": "🟡 Medium",
+            "payload": f"vote_medium_{station_key}"
+        },
+        {
+            "content_type": "text",
+            "title": "🔴 Heavy",
+            "payload": f"vote_heavy_{station_key}"
+        }
+    ]
+    
+    # 6. Dispatch the Text Layout bundled with the Interactive Buttons
+    send_text(user_id, dashboard_text, quick_replies=quick_replies_payload)
         
   # Read instantly from lightning-fast RAM memory profile store
     active_cache = STATION_PROFILES[station_key]
