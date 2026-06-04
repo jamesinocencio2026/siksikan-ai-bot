@@ -443,24 +443,54 @@ def handle_postback(user_id, payload):
         send_text(user_id, "✅ Thank you! Your real-time platform report has been anonymously verified and saved.")
 
 def deliver_dashboard(user_id, station_key, current_time):
+    # 1. Read instantly from lightning-fast RAM memory profile store
     profile = STATION_PROFILES[station_key]
-    name = profile["name"]
+    name = profile.get("name", station_key)
     
-    # 💥 FIXED: These lines must be here to read your new coordinates
+    # Safely extract your upgraded separate decimal geography configuration keys
     lat = profile.get("lat")
     lon = profile.get("lon")
 
-    # 💥 FIXED: This line tracks analytics footprints correctly
+    # 2. Silently stream active commuter user interaction footprint to the database
     stream_interaction_to_cloud(station_key, "dashboard_view")
 
-    # 💥 FIXED: These establish the server's cache countdown timers
+    # 3. Process Global 10-Minute Anti-Lag Memory Cache Engine
     now_timestamp = current_time.timestamp()
-    cache_expiry_seconds = 600
+    cache_expiry_seconds = 600 # 10 Minutes exact window
+
+    # 💥 CRITICAL UPDATE: Initialize fallback variables so Python never throws a NameError
+    status = "UNKNOWN PLATFORM"
+    weather_condition = "Clear Sky"
 
     if station_key not in GLOBAL_SYSTEM_CACHE or (now_timestamp - GLOBAL_SYSTEM_CACHE[station_key]["last_updated"]) > cache_expiry_seconds:
-        # Cache expired or empty! Fetch fresh API payloads safely once
+        # Cache expired or empty! Fetch fresh API payloads safely once using split lat/lon
         weather_impact, weather_condition = get_weather_data(lat, lon)
         status = calculate_density(station_key, current_time, weather_impact)
+        
+        # Lock metrics right into local memory state
+        GLOBAL_SYSTEM_CACHE[station_key] = {
+            "last_updated": now_timestamp,
+            "status": status,
+            "weather": weather_condition
+        }
+    else:
+        # Cache is completely valid! Pull directly from RAM to avoid hitting API rate limits
+        status = GLOBAL_SYSTEM_CACHE[station_key].get("status", "LIGHT PLATFORM")
+        weather_condition = GLOBAL_SYSTEM_CACHE[station_key].get("weather", "Clear Sky")
+
+    # 4. Generate the Blended Real-Time Dashboard Card Layout
+    dashboard_text = (
+        f"📊 **Siksikan AI Live Dashboard**\n\n"
+        f"📍 Location: 🚇 {name}\n"
+        f"🚦 Status: **{status.upper()}**\n"
+        f"🌤️ Weather: {weather_condition.title()}\n"
+        f"🕒 **As of {current_time.strftime('%I:%M %p PST')}**\n\n"
+        f"Help your fellow commuters! If you are standing at the platform right now, "
+        f"verify conditions by choosing below:"
+    )
+    
+    # 5. Dispatch UI Payload Block directly to Meta Webhook Graph Channel
+    send_text(user_id, dashboard_text)
         
   # Read instantly from lightning-fast RAM memory profile store
     active_cache = STATION_PROFILES[station_key]
