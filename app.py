@@ -319,10 +319,14 @@ def calculate_density(station_id, pht_now, weather_impact):
     if (pht_now.day in [14, 15, 30, 31]) and day == 4: score += 25
     elif date_str in PH_HOLIDAYS: score += 20
 
-    # 3. Environment API Injection
+   # # 3. Environment API Injection
     score += weather_impact
-    score += get_traffic_impact(profile["coords"])
-
+    
+    # 💥 THE FIX: Safely parse separate lat/lon keys instead of the old coords lookup
+    lat = profile.get("lat")
+    lon = profile.get("lon")
+    score += get_traffic_impact(lat, lon)
+    
     # 4. Filtered Crowdsourced Verification Stream
     crowd_score, total_voters = get_recent_crowdsource_score(station_id)
     score += crowd_score
