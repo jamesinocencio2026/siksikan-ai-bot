@@ -421,15 +421,16 @@ def deliver_dashboard(user_id, station_key, current_time):
     active_cache = GLOBAL_SYSTEM_CACHE[station_key]
     
     # 3. Generate clear time stamp text display strings for user convenience
-    time_stamp_display = current_time.strftime("%I:%M %p PST")
-    
+    # 3. Generate clear time stamp text display strings for user convenience
+    time_stamp_display = current_time.strftime("%I:%M %p")
+
     msg = (
-        f"📊 *Siksikan AI Live Dashboard*\n\n"
+        "📊 *Siksikan AI Live Dashboard*\n\n"
         f"📍 Location: {name}\n"
         f"🚦 Status: {active_cache['status']}\n"
-        f"🌤️ Weather: {active_cache['weather']}\n\n"
-        f"Help your fellow commuters! If you are standing at the platform right now, verify conditions by choosing below:\n\n"
-        f"🕒 _As of: {time_stamp_display}_"
+        f"🌤️ Weather: {active_cache['weather']}\n"
+        f"🕒 *As of {time_stamp_display} PST*\n\n"  # <-- Clean, crisp bold formatting
+        "Help your fellow commuters! If you are standing at the platform right now, verify conditions by choosing below:\n\n"
     )
     send_simplified_buttons(user_id, msg, station_key)
 
