@@ -446,23 +446,21 @@ def deliver_dashboard(user_id, station_key, current_time):
     profile = STATION_PROFILES[station_key]
     name = profile["name"]
     
-    # 1. Silently stream active commuter user interaction footprint to the database
+    # 💥 FIXED: These lines must be here to read your new coordinates
+    lat = profile.get("lat")
+    lon = profile.get("lon")
+
+    # 💥 FIXED: This line tracks analytics footprints correctly
     stream_interaction_to_cloud(station_key, "dashboard_view")
-    
-    # 2. Process Global 10-Minute Anti-Lag Memory Cache Engine
+
+    # 💥 FIXED: These establish the server's cache countdown timers
     now_timestamp = current_time.timestamp()
-    cache_expiry_seconds = 600  # 10 Minutes exact window
-    
+    cache_expiry_seconds = 600
+
     if station_key not in GLOBAL_SYSTEM_CACHE or (now_timestamp - GLOBAL_SYSTEM_CACHE[station_key]["last_updated"]) > cache_expiry_seconds:
         # Cache expired or empty! Fetch fresh API payloads safely once
-        weather_impact, weather_condition = get_weather_data(profile["coords"])
+        weather_impact, weather_condition = get_weather_data(lat, lon)
         status = calculate_density(station_key, current_time, weather_impact)
-        
-        GLOBAL_SYSTEM_CACHE[station_key] = {
-            "last_updated": now_timestamp,
-            "status": status,
-            "weather": weather_condition
-        }
         
   # Read instantly from lightning-fast RAM memory profile store
     active_cache = STATION_PROFILES[station_key]
