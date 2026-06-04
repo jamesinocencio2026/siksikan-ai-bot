@@ -592,9 +592,22 @@ def deliver_dashboard(user_id, station_key, current_time):
 
     send_simplified_buttons(user_id, msg, station_key)
     
-def send_text(recipient_id, text):
+def send_text(recipient_id, text, quick_replies=None):
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
-    requests.post(url, json={"recipient": {"id": recipient_id}, "message": {"text": text}}, timeout=5)
+    
+    # Construct base message payload dictionary
+    message_payload = {"text": text}
+    
+    # If interactive quick reply buttons are passed, inject them into the payload layout
+    if quick_replies:
+        message_payload["quick_replies"] = quick_replies
+        
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": message_payload
+    }
+    
+    requests.post(url, json=payload, timeout=5)
 
 def send_direction_menu(recipient_id, base_station_key):
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={FB_PAGE_ACCESS_TOKEN}"
