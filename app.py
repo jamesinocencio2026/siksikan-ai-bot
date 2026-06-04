@@ -420,7 +420,7 @@ def handle_message(user_id, text):
 
     send_text(user_id, "👋 Welcome to Siksikan AI!\n\nType any active station name from LRT-1, LRT-2, or MRT-3 to verify platform congestion conditions and live local weather details (e.g., 'Guadalupe', 'Gil Puyat', 'Recto').")
 def handle_postback(user_id, payload):
-    pht = timezone("Asia/Manila")
+    pht = pytz.timezone("Asia/Manila")
     now = datetime.now(pht)
     
     if payload.startswith("QUERY_"):
