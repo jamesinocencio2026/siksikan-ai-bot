@@ -378,7 +378,7 @@ def webhook():
     return "Not Found", 404
 
 def handle_message(user_id, text):
-    pht = timezone("Asia/Manila")
+    pht = pytz.timezone("Asia/Manila")
     now = datetime.now(pht)
     
     if now.hour < 5 or (now.hour == 22 and now.minute > 30) or now.hour > 22:
