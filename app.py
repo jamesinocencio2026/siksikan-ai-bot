@@ -592,7 +592,7 @@ def deliver_dashboard(user_id, station_key, current_time):
 
     # 3. Pull live, unexpired crowd feedback parameters from Supabase
     recent_reports = supabase.table("station_traffic_logs") \
-        .select("status_clicked") \
+        .select("action_type") \
         .eq("station_key", station_key) \
         .gte("created_at", thirty_minutes_ago) \
         .execute()
@@ -601,7 +601,7 @@ def deliver_dashboard(user_id, station_key, current_time):
     if recent_reports.data and len(recent_reports.data) >= 3:
         vote_scores = []
         for r in recent_reports.data:
-            vote = r['status_clicked'].lower()
+            ote = r['action_type'].lower()
             if vote == 'heavy': vote_scores.append(3)
             elif vote == 'medium': vote_scores.append(2)
             elif vote == 'light': vote_scores.append(1)
