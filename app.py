@@ -593,7 +593,7 @@ def deliver_dashboard(user_id, station_key, current_time):
     # 3. Pull live, unexpired crowd feedback parameters from Supabase
     recent_reports = supabase.table("station_traffic_logs") \
         .select("action_type") \
-        .eq("station_key", station_key) \
+        .eq("station_id", station_key) \
         .gte("created_at", thirty_minutes_ago) \
         .execute()
 
