@@ -505,7 +505,7 @@ def deliver_dashboard(user_id, station_key, current_time):
     lon = profile.get("lon")
 
     # 2. Silently stream active commuter user interaction footprint to the database
-    stream_interaction_to_cloud(user_id, station_, "dashboard_view")
+    stream_interaction_to_cloud(user_id, station_key, "dashboard_view")
 
     # 3. Process Global 10-Minute Anti-Lag Memory Cache Engine
     now_timestamp = current_time.timestamp()
