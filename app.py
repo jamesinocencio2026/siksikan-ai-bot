@@ -408,16 +408,16 @@ def handle_message(user_id, text):
         for key, data in STATION_PROFILES.items():
             station_base_words = data["name"].lower().replace("(", "").replace(")", "").split()
             if any(word in text for word in station_base_words if len(word) > 4):
-                if "northbound" in text and key.endswith("_nb"):
+				if "northbound" in text and key.lower().endswith("_nb"):
 						deliver_dashboard(user_id, key, now)
 						return
-					elif "southbound" in text and key.endswith("_sb"):
+					elif "southbound" in text and key.lower().endswith("_sb"):
 						deliver_dashboard(user_id, key, now)
 						return
-					elif "eastbound" in text and key.endswith("_eb"):
+					elif "eastbound" in text and key.lower().endswith("_eb"):
 						deliver_dashboard(user_id, key, now)
 						return
-					elif "westbound" in text and key.endswith("_wb"):
+					elif "westbound" in text and key.lower().endswith("_wb"):
 						deliver_dashboard(user_id, key, now)
 						return
 
@@ -466,8 +466,6 @@ def handle_postback(user_id, payload):
 
 def deliver_dashboard(user_id, station_key, current_time):
     # 1. Read instantly from lightning-fast RAM memory profile store
-    profile = STATION_PROFILES[station_key]
-    name = profile.get("name", station_key)
     
     # Safely extract your upgraded separate decimal geography configuration keys
     lat = profile.get("lat")
