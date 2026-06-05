@@ -409,17 +409,17 @@ def handle_message(user_id, text):
             station_base_words = data["name"].lower().replace("(", "").replace(")", "").split()
             if any(word in text for word in station_base_words if len(word) > 4):
                 if "northbound" in text and key.endswith("_nb"):
-                    deliver_dashboard(user_id, key, now)
-                    return
-                elif "southbound" in text and key.endswith("_sb"):
-                    deliver_dashboard(user_id, key, now)
-                    return
-                elif "eastbound" in text and key.endswith("_eb"):
-                    deliver_dashboard(user_id, key, now)
-                    return
-                elif "westbound" in text and key.endswith("_wb"):
-                    deliver_dashboard(user_id, key, now)
-                    return
+						deliver_dashboard(user_id, key, now)
+						return
+					elif "southbound" in text and key.endswith("_sb"):
+						deliver_dashboard(user_id, key, now)
+						return
+					elif "eastbound" in text and key.endswith("_eb"):
+						deliver_dashboard(user_id, key, now)
+						return
+					elif "westbound" in text and key.endswith("_wb"):
+						deliver_dashboard(user_id, key, now)
+						return
 
     # Existing Dynamic Station Intent Search Gate
     matched_stations = []
