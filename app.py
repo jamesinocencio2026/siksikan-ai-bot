@@ -331,8 +331,14 @@ def calculate_density(station_id, pht_now, weather_impact):
     
     # 💥 THE FIX: Safely parse separate lat/lon keys instead of the old coords lookup
     lat = profile.get("lat")
-    lon = profile.get("lon")
-    score += get_traffic_impact(lat, lon)
+        lon = profile.get("lon")
+        raw_traffic_score = get_traffic_impact(lat, lon)
+
+        # Dampen TomTom's traffic impact weight if it is 8:00 PM (20) or later
+        if hour >= 20:
+            score += (raw_traffic_score * 0.5)
+        else:
+            score += raw_traffic_score
     
     # 4. Filtered Crowdsourced Verification Stream
     crowd_score, total_voters = get_recent_crowdsource_score(station_id)
@@ -394,8 +400,8 @@ def handle_message(user_id, text):
     pht = pytz.timezone("Asia/Manila")
     now = datetime.now(pht)
     
-    if now.hour < 5 or (now.hour == 22 and now.minute > 30) or now.hour > 22:
-        send_text(user_id, "🌙 *Train lines are currently closed.*\n\nOperating Hours: 5:00 AM - 10:30 PM PHT.")
+   if now.hour < 5 or now.hour >= 21:
+        send_text(user_id, "🔒 Siksikan AI is now closed for the night. Our operating hours are from 5:00 AM to 9:00 PM daily. See you tomorrow morning!")
         return
 
     # 🛠️ FIX: Intercept the Quick Reply Button text so it routes to the Dashboard
@@ -435,7 +441,11 @@ def handle_message(user_id, text):
 def handle_postback(user_id, payload):
     pht = pytz.timezone("Asia/Manila")
     now = datetime.now(pht)
-    
+
+    if now.hour < 5 or now.hour >= 21:
+        send_text(user_id, "🔒 Siksikan AI is now closed for the night. Our operating hours are from 5:00 AM to 9:00 PM daily. See you tomorrow morning!")
+    return
+        
     if payload.startswith("QUERY_"):
         station_key = payload.replace("QUERY_", "")
         deliver_dashboard(user_id, station_key, now)
@@ -585,7 +595,7 @@ def deliver_dashboard(user_id, station_key, current_time):
         "📊 *Siksikan AI Live Dashboard*\n\n"
         f"📍 Location: 🚇 {name}\n"
         f"🚦 Status: {status_text}\n"
-        f"🌤️ Weather: {active_cache['weather']}\n"
+        f"⛅ Weather: {weather_condition.title()} ({temperature}°C)\n"
         f"🕒 *As of {time_stamp_display} PST*\n\n"
         "Help your fellow commuters! If you are standing at the platform right now, verify conditions by choosing below:\n\n"
     )
