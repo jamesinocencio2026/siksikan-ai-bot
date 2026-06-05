@@ -403,23 +403,23 @@ def handle_message(user_id, text):
         send_text(user_id, "🔒 Siksikan AI is now closed for the night. Our operating hours are from 5:00 AM to 9:00 PM daily. See you tomorrow morning!")
         return
 
-    # 🛠️ FIX: Intercept the Quick Reply Button text so it routes to the Dashboard
+# FIX: Intercept the Quick Reply Button text so it routes to the Dashboard
     if "platform" in text:
         for key, data in STATION_PROFILES.items():
             station_base_words = data["name"].lower().replace("(", "").replace(")", "").split()
             if any(word in text for word in station_base_words if len(word) > 4):
-				if "northbound" in text and key.lower().endswith("_nb"):
-						deliver_dashboard(user_id, key, now)
-						return
-					elif "southbound" in text and key.lower().endswith("_sb"):
-						deliver_dashboard(user_id, key, now)
-						return
-					elif "eastbound" in text and key.lower().endswith("_eb"):
-						deliver_dashboard(user_id, key, now)
-						return
-					elif "westbound" in text and key.lower().endswith("_wb"):
-						deliver_dashboard(user_id, key, now)
-						return
+                if "northbound" in text and key.lower().endswith("_nb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+                elif "southbound" in text and key.lower().endswith("_sb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+                elif "eastbound" in text and key.lower().endswith("_eb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+                elif "westbound" in text and key.lower().endswith("_wb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
 
     # Existing Dynamic Station Intent Search Gate
     matched_stations = []
