@@ -562,7 +562,6 @@ def deliver_dashboard(user_id, station_key, current_time):
     ]
     
     # 6. Dispatch the Text Layout bundled with the Interactive Buttons
-    send_text(user_id, dashboard_text, quick_replies=quick_replies_payload)
         
   # Read instantly from lightning-fast RAM memory profile store
     active_cache = STATION_PROFILES[station_key]
