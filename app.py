@@ -399,7 +399,7 @@ def handle_message(user_id, text):
     pht = pytz.timezone("Asia/Manila")
     now = datetime.now(pht)
     
-   if now.hour < 5 or now.hour >= 21:
+    if now.hour < 5 or now.hour >= 21:
         send_text(user_id, "🔒 Siksikan AI is now closed for the night. Our operating hours are from 5:00 AM to 9:00 PM daily. See you tomorrow morning!")
         return
 
