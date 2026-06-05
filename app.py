@@ -330,11 +330,10 @@ def calculate_density(station_id, pht_now, weather_impact):
     score += weather_impact
     
     # 💥 THE FIX: Safely parse separate lat/lon keys instead of the old coords lookup
-    lat = profile.get("lat")
+        lat = profile.get("lat")
         lon = profile.get("lon")
         raw_traffic_score = get_traffic_impact(lat, lon)
 
-        # Dampen TomTom's traffic impact weight if it is 8:00 PM (20) or later
         if hour >= 20:
             score += (raw_traffic_score * 0.5)
         else:
