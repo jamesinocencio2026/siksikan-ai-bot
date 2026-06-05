@@ -327,17 +327,17 @@ def calculate_density(station_id, pht_now, weather_impact):
     # 2. Calendar Anomalies & Holiday Offsets
     
    # # 3. Environment API Injection
-score += weather_impact
+    score += weather_impact
 
-        # THE FIX: Safely parse separate lat/lon keys instead of the old coords lookup
-        lat = profile.get("lat")
-        lon = profile.get("lon")
-        raw_traffic_score = get_traffic_impact(lat, lon)
+    # THE FIX: Safely parse separate lat/lon keys instead of the old coords lookup
+    lat = profile.get("lat")
+    lon = profile.get("lon")
+    raw_traffic_score = get_traffic_impact(lat, lon)
 
-        if hour >= 20:
-            score += (raw_traffic_score * 0.5)
-        else:
-            score += raw_traffic_score
+    if hour >= 20:
+        score += (raw_traffic_score * 0.5)
+    else:
+        score += raw_traffic_score
             
     # 4. Filtered Crowdsourced Verification Stream
     crowd_score, total_voters = get_recent_crowdsource_score(station_id)
