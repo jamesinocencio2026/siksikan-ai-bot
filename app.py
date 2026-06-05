@@ -467,7 +467,7 @@ def handle_postback(user_id, payload):
         station_id = "_".join(parts[2:])  # Reassembles target station key ID string
         
         # One-Tap Data Input: Safely stream valid entry data straight to cloud storage ledger
-        stream_interaction_to_cloud(station_id, f"vote_{tier}")
+        stream_interaction_to_cloud(user_id, station_id, f"vote_{tier}")
         
         # Instantly refresh the global system cache memory to reflect the new crowd feedback
         if station_id in GLOBAL_SYSTEM_CACHE:
@@ -505,7 +505,7 @@ def deliver_dashboard(user_id, station_key, current_time):
     lon = profile.get("lon")
 
     # 2. Silently stream active commuter user interaction footprint to the database
-    stream_interaction_to_cloud(station_key, "dashboard_view")
+    stream_interaction_to_cloud(user id, station_key, "dashboard_view")
 
     # 3. Process Global 10-Minute Anti-Lag Memory Cache Engine
     now_timestamp = current_time.timestamp()
