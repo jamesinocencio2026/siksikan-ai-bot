@@ -478,8 +478,29 @@ def handle_postback(user_id, payload):
 
 def deliver_dashboard(user_id, station_key, current_time):
     # 1. Read instantly from lightning-fast RAM memory profile store
+    station_key_clean = station_key.strip()
     
-    # Safely extract your upgraded separate decimal geography configuration keys
+    # Check direct match
+    profile = STATION_PROFILES.get(station_key_clean)
+    
+    # Fallback 1: Check case-insensitive match
+    if not profile:
+        profile = next((data for k, data in STATION_PROFILES.items() if k.lower() == station_key_clean.lower()), None)
+        
+    # Fallback 2: Convert standard direction suffixes if mismatched
+    if not profile:
+        if station_key_clean.lower().endswith("_wb"):
+            alt_key = station_key_clean.lower().replace("_wb", "_sb")
+            profile = next((data for k, data in STATION_PROFILES.items() if k.lower() == alt_key), None)
+        elif station_key_clean.lower().endswith("_eb"):
+            alt_key = station_key_clean.lower().replace("_eb", "_nb")
+            profile = next((data for k, data in STATION_PROFILES.items() if k.lower() == alt_key), None)
+
+    if not profile:
+        send_text(user_id, f"❌ Debug Warning: Station profile for '{station_key}' could not be resolved.")
+        return
+
+    name = profile.get("name", station_key)
     lat = profile.get("lat")
     lon = profile.get("lon")
 
