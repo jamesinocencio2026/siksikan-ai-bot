@@ -443,7 +443,7 @@ def handle_postback(user_id, payload):
 
     if now.hour < 5 or now.hour >= 21:
         send_text(user_id, "🔒 Siksikan AI is now closed for the night. Our operating hours are from 5:00 AM to 9:00 PM daily. See you tomorrow morning!")
-    return
+        return
         
     if payload.startswith("QUERY_"):
         station_key = payload.replace("QUERY_", "")
