@@ -192,37 +192,37 @@ def update_weather_and_tomtom_cache():
     
 # --- DATA FUSION MODIFIERS, CLOUD STREAMING & API CONFIGURATIONS ---
 
-def stream_interaction_to_cloud(station_key, interaction_type):
+def stream_interaction_to_cloud(user_id, station_id, interaction_type):
     """
     Silently logs user intent and interaction metrics to Supabase.
-    Builds a professional, historically accurate database for future business pitches.
+    Includes error handling to ensure the bot always replies to the user.
     """
     try:
         pht = timezone("Asia/Manila")
         manila_now = datetime.now(pht)
-        
+
         # Automatically determine the transit rail line tier
-        if station_key.startswith("mrt3_"):
+        if station_id.startswith("mrt3_"):
             line_tier = "MRT-3"
-        elif station_key.startswith("lrt1_"):
+        elif station_id.startswith("lrt1_"):
             line_tier = "LRT-1"
-        elif station_key.startswith("lrt2_"):
+        elif station_id.startswith("lrt2_"):
             line_tier = "LRT-2"
         else:
             line_tier = "Unknown"
 
         payload = {
+            "user_id": str(user_id) if user_id else "unknown",
             "created_at": manila_now.isoformat(),
             "line": line_tier,
-            "station_id": station_key,
+            "station_id": station_id,
             "action_type": interaction_type,
-            "hour_block": manila_now.strftime("%I:00 %p")  # Groups data by clean hours (e.g., "07:00 AM")
+            "hour_block": manila_now.strftime("%I:00 %p")
         }
-        
-        # Fire background stream entry to your Supabase tables
         supabase.table("station_traffic_logs").insert(payload).execute()
+        
     except Exception as e:
-        print(f"Cloud database stream bypassed smoothly: {e}")
+        print(f"Database stream event: {e}")
 
 def get_recent_crowdsource_score(station_key):
     """
