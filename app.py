@@ -600,11 +600,13 @@ def deliver_dashboard(user_id, station_key, current_time):
     # 4. Compute Weighted Data Fusion (40% Telemetry + 60% User Verified Reality)
     if recent_reports.data and len(recent_reports.data) >= 3:
         vote_scores = []
+        # Only use ONE loop here
         for r in recent_reports.data:
-            ote = r['action_type'].lower()
-            if vote == 'heavy': vote_scores.append(3)
-            elif vote == 'medium': vote_scores.append(2)
-            elif vote == 'light': vote_scores.append(1)
+            # Use 'vote' to store the value
+            vote = r['action_type'].lower()
+            if 'heavy' in vote: vote_scores.append(3)
+            elif 'medium' in vote: vote_scores.append(2)
+            elif 'light' in vote: vote_scores.append(1)
             
         crowd_average = sum(vote_scores) / len(vote_scores)
         final_score = (base_score * 0.4) + (crowd_average * 0.6)
