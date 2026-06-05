@@ -403,23 +403,30 @@ def handle_message(user_id, text):
         send_text(user_id, "🔒 Siksikan AI is now closed for the night. Our operating hours are from 5:00 AM to 9:00 PM daily. See you tomorrow morning!")
         return
 
-# FIX: Intercept the Quick Reply Button text and map East/West to your _nb/_sb keys
+# FIX: Intercept the Quick Reply Button text and map East/West to your _nb/_sb keys cleanly
     if "platform" in text:
+        text_lower = text.lower()
         for key, data in STATION_PROFILES.items():
-            station_base_words = data["name"].lower().replace("(", "").replace(")", "").split()
-            if any(word in text for word in station_base_words if len(word) > 4):
+            # Get just the core station name in lowercase (e.g., "guadalupe" or "recto")
+            station_name_clean = data["name"].lower().split("(")[0].strip()
+            
+            # Make sure this specific station name is inside the button text clicked by the user
+            if station_name_clean in text_lower:
                 clean_key = key.lower()
                 
                 # Standard MRT-3 and LRT-1 matching
-                if "northbound" in text and clean_key.endswith("_nb"):
+                if "northbound" in text_lower and clean_key.endswith("_nb"):
                     deliver_dashboard(user_id, key, now)
                     return
-                elif "southbound" in text and clean_key.endswith("_sb"):
+                elif "southbound" in text_lower and clean_key.endswith("_sb"):
                     deliver_dashboard(user_id, key, now)
                     return
                     
                 # LRT-2 Mapping: Eastbound maps to _nb keys, Westbound maps to _sb keys
-                elif "eastbound" in text and clean_key.endswith("_nb"):
+                elif "eastbound" in text_lower and clean_key.endswith("_nb"):
+                    deliver_dashboard(user_id, key, now)
+                    return
+                elif "westbound" in text_lower and clean_key.endswith("_sb"):
                     deliver_dashboard(user_id, key, now)
                     return
                 elif "westbound" in text and clean_key.endswith("_sb"):
