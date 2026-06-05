@@ -403,21 +403,26 @@ def handle_message(user_id, text):
         send_text(user_id, "🔒 Siksikan AI is now closed for the night. Our operating hours are from 5:00 AM to 9:00 PM daily. See you tomorrow morning!")
         return
 
-# FIX: Intercept the Quick Reply Button text so it routes to the Dashboard
+# FIX: Intercept the Quick Reply Button text and map East/West to your _nb/_sb keys
     if "platform" in text:
         for key, data in STATION_PROFILES.items():
             station_base_words = data["name"].lower().replace("(", "").replace(")", "").split()
             if any(word in text for word in station_base_words if len(word) > 4):
-                if "northbound" in text and key.endswith("_nb"):
+                clean_key = key.lower()
+                
+                # Standard MRT-3 and LRT-1 matching
+                if "northbound" in text and clean_key.endswith("_nb"):
                     deliver_dashboard(user_id, key, now)
                     return
-                elif "southbound" in text and key.endswith("_sb"):
+                elif "southbound" in text and clean_key.endswith("_sb"):
                     deliver_dashboard(user_id, key, now)
                     return
-                elif "eastbound" in text and key.endswith("_eb"):
+                    
+                # LRT-2 Mapping: Eastbound maps to _nb keys, Westbound maps to _sb keys
+                elif "eastbound" in text and clean_key.endswith("_nb"):
                     deliver_dashboard(user_id, key, now)
                     return
-                elif "westbound" in text and key.endswith("_wb"):
+                elif "westbound" in text and clean_key.endswith("_sb"):
                     deliver_dashboard(user_id, key, now)
                     return
 
